@@ -129,12 +129,9 @@ public class Node {
             }
             ss = new SerializationServiceBuilder()
                     .setClassLoader(configClassLoader)
-                    .setConfig(config.getSerializationConfig())
+                    .setConfig(config.getSerializationConfig() != null ? config.getSerializationConfig() : new SerializationConfig())
                     .setManagedContext(hazelcastInstance.managedContext)
                     .setPartitioningStrategy(partitioningStrategy)
-                    .setInitialOutputBufferSize(groupProperties.SERIALIZATION_BUFFER_SIZE.getInteger())
-                    .setEnableCompression(groupProperties.SERIALIZATION_GZIP_ENABLED.getBoolean())
-                    .setEnableSharedObject(groupProperties.SERIALIZATION_READ_SHARED_ENABLED.getBoolean())
                     .setHazelcastInstance(hazelcastInstance)
                     .build();
         } catch (Exception e) {
@@ -213,8 +210,6 @@ public class Node {
         this.multicastService = mcService;
         initializeListeners(config);
         joiner = nodeContext.createJoiner(this);
-        
-    	logger.info("OVERRIDED NODE IMPLEMENTATION");
     }
 
     private void initializeListeners(Config config) {
@@ -354,19 +349,7 @@ public class Node {
         initializer.afterInitialize(this);
     }
 
-    public void shutdown(final boolean force, final boolean now) {
-        if (now) {
-            doShutdown(force);
-        } else {
-            new Thread(new Runnable() {
-                public void run() {
-                    doShutdown(force);
-                }
-            }).start();
-        }
-    }
-
-    private void doShutdown(boolean force) {
+    public void shutdown(final boolean force) {
         long start = Clock.currentTimeMillis();
         logger.finest( "** we are being asked to shutdown when active = " + String.valueOf(active));
         if (!force && isActive()) {
@@ -478,7 +461,7 @@ public class Node {
                 if (isActive() && !completelyShutdown) {
                     completelyShutdown = true;
                     if (groupProperties.SHUTDOWNHOOK_ENABLED.getBoolean()) {
-                        shutdown(true, true);
+                        shutdown(true);
                     }
                 } else {
                     logger.finest( "shutdown hook - we are not --> active and not completely down so we are not calling shutdown");
@@ -542,13 +525,12 @@ public class Node {
                 joiner.join(joined);
             }
         } catch (Exception e) {
-        	
 //            if (Clock.currentTimeMillis() - joinStartTime < maxJoinMillis) {
 //                logger.warning("Trying to rejoin: " + e.getMessage());
 //                rejoin();
 //            } else {
                 logger.severe( "Could not join cluster, shutting down!", e);
-                shutdown(true, true);
+                shutdown(true);
                 
                 System.out.println("************************************");
                 System.out.println("Print threads: ");
@@ -559,7 +541,7 @@ public class Node {
                 	}
                 	System.out.println("\t"+thread.getName()+append);
                 }
-                System.out.println("************************************");
+                System.out.println("************************************");                
 //            }
         }
     }
